@@ -311,6 +311,7 @@ AudioStream * AudioStream::first_update = NULL;
 
 void software_isr(void) // AudioStream::update_all()
 {
+	++software_isr_count;
 	AudioStream *p;
 
 	uint32_t totalcycles = ARM_DWT_CYCCNT;

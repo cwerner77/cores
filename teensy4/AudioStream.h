@@ -72,6 +72,7 @@ typedef struct audio_block_struct {
 	uint32_t seq;
 } audio_block_t;
 
+extern volatile uint32_t software_isr_count;
 
 class AudioConnection
 {
