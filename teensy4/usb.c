@@ -11,6 +11,7 @@
 #include "usb_touch.h"
 #include "usb_midi.h"
 #include "usb_audio.h"
+#include "usb_mtp.h"
 #include "core_pins.h" // for delay()
 #include "avr/pgmspace.h"
 #include <string.h>
@@ -22,6 +23,8 @@
 //uint32_t transfer_log[LOG_SIZE];
 
 // device mode, page 3155
+
+#if defined(NUM_ENDPOINTS)
 
 typedef struct endpoint_struct endpoint_t;
 
@@ -54,6 +57,10 @@ struct endpoint_struct {
 	uint32_t pointer4;
 	uint32_t callback_param;
 };*/
+
+#ifdef EXPERIMENTAL_INTERFACE
+uint8_t experimental_buffer[1152] __attribute__ ((section(".dmabuffers"), aligned(64)));
+#endif
 
 endpoint_t endpoint_queue_head[(NUM_ENDPOINTS+1)*2] __attribute__ ((used, aligned(4096)));
 
@@ -455,6 +462,12 @@ static void endpoint0_setup(uint64_t setupdata)
 		#if defined(AUDIO_INTERFACE)
 		usb_audio_configure();
 		#endif
+		#if defined(MTP_INTERFACE)
+		usb_mtp_configure();
+		#endif
+		#if defined(EXPERIMENTAL_INTERFACE)
+		endpoint_queue_head[2].unused1 = (uint32_t)experimental_buffer;
+		#endif
 		endpoint0_receive(NULL, 0, 0);
 		return;
 	  case 0x0880: // GET_CONFIGURATION
@@ -766,12 +779,16 @@ static void endpoint0_complete(void)
 	}
 #endif
 #ifdef SEREMU_INTERFACE
-	if (setup.word1 == 0x03000921 && setup.word2 == ((4<<16)|SEREMU_INTERFACE)
-	  && endpoint0_buffer[0] == 0xA9 && endpoint0_buffer[1] == 0x45
-	  && endpoint0_buffer[2] == 0xC2 && endpoint0_buffer[3] == 0x6B) {
-		printf("seremu reboot request\n");
-		usb_start_sof_interrupts(NUM_INTERFACE);
-		usb_reboot_timer = 80; // TODO: 10 if only 12 Mbit/sec
+	if (setup.word1 == 0x03000921 && setup.word2 == ((4<<16)|SEREMU_INTERFACE)) {
+		if (endpoint0_buffer[0] == 0xA9 && endpoint0_buffer[1] == 0x45
+		  && endpoint0_buffer[2] == 0xC2 && endpoint0_buffer[3] == 0x6B) {
+			printf("seremu reboot request\n");
+			usb_start_sof_interrupts(NUM_INTERFACE);
+			usb_reboot_timer = 80; // TODO: 10 if only 12 Mbit/sec
+		} else {
+			// any other feature report means Arduino Serial Monitor is open
+			usb_seremu_online = 1;
+		}
 	}
 #endif
 #ifdef AUDIO_INTERFACE
@@ -992,7 +1009,7 @@ void usb_receive(int endpoint_number, transfer_t *transfer)
 
 uint32_t usb_transfer_status(const transfer_t *transfer)
 {
-#if 0
+#if defined(USB_MTPDISK) || defined(USB_MTPDISK_SERIAL)
 	uint32_t status, cmd;
 	//int count=0;
 	cmd = USB1_USBCMD;
@@ -1012,4 +1029,10 @@ uint32_t usb_transfer_status(const transfer_t *transfer)
 #endif
 }
 
+#else // defined(NUM_ENDPOINTS)
 
+void usb_init(void)
+{
+}
+
+#endif // defined(NUM_ENDPOINTS)
