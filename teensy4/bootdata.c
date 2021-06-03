@@ -10,7 +10,11 @@ extern unsigned long _flashimagelen;
 
 __attribute__ ((section(".bootdata"), used))
 const uint32_t BootData[3] = {
+#ifdef RT1064
+	0x70000000,
+#else
 	0x60000000,
+#endif
 	(uint32_t)&_flashimagelen,
 	0
 };

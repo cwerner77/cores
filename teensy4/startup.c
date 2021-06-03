@@ -7,6 +7,9 @@
 
 #include "debug/printf.h"
 
+#undef HAS_EXTRAM
+
+
 // from the linker
 extern unsigned long _stextload;
 extern unsigned long _stext;
@@ -31,7 +34,9 @@ static void reset_PFD();
 extern void systick_isr(void);
 extern void pendablesrvreq_isr(void);
 void configure_cache(void);
+#ifdef HAS_EXTRAM
 void configure_external_ram(void);
+#endif
 void unused_interrupt_vector(void);
 void usb_pll_start();
 extern void analog_init(void); // analog.c
@@ -129,9 +134,12 @@ void ResetHandler(void)
 	}
 	SNVS_HPCR |= SNVS_HPCR_RTC_EN | SNVS_HPCR_HP_TS;
 
+#ifdef HAS_EXTRAM
 #ifdef ARDUINO_TEENSY41
 	configure_external_ram();
 #endif
+#endif
+
 	startup_early_hook();
 	while (millis() < 20) ; // wait at least 20ms before starting USB
 	usb_init();
@@ -258,7 +266,11 @@ FLASHMEM void configure_cache(void)
 	SCB_MPU_RASR = MEM_CACHE_WBWA | READONLY | SIZE_16M;
 
 	SCB_MPU_RBAR = 0x70000000 | REGION(i++); // FlexSPI2
-	SCB_MPU_RASR = MEM_CACHE_WBWA | READWRITE | NOEXEC | SIZE_16M;
+#ifndef RT1064
+	SCB_MPU_RASR = MEM_CACHE_WBWA | READWRITE | NOEXEC | SIZE_8M;
+#else
+	SCB_MPU_RASR = MEM_CACHE_WBWA | READONLY | SIZE_4M;
+#endif
 
 	// TODO: protect access to power supply config
 
@@ -273,6 +285,10 @@ FLASHMEM void configure_cache(void)
 	asm("isb");
 	SCB_CCR |= (SCB_CCR_IC | SCB_CCR_DC);
 }
+
+
+
+#ifdef HAS_EXTRAM
 
 #ifdef ARDUINO_TEENSY41
 
@@ -439,10 +455,12 @@ FLASHMEM void configure_external_ram()
 	} else {
 		// No PSRAM
 		memset(&extmem_smalloc_pool, 0, sizeof(extmem_smalloc_pool));
-	}
+	// }
 }
 
 #endif // ARDUINO_TEENSY41
+
+#endif // HAS_EXTRAM
 
 
 FLASHMEM void usb_pll_start()
