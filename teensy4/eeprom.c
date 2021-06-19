@@ -227,6 +227,8 @@ void eeprom_write_block(const void *buf, void *addr, uint32_t len)
 
 static void flash_wait()
 {
+
+#ifndef RT1064
 	FLEXSPI_LUT60 = LUT0(CMD_SDR, PINS1, 0x05) | LUT1(READ_SDR, PINS1, 1); // 05 = read status
 	FLEXSPI_LUT61 = 0;
 	uint8_t status;
@@ -242,6 +244,23 @@ static void flash_wait()
 	} while (status & 1);
 	FLEXSPI_MCR0 |= FLEXSPI_MCR0_SWRESET; // purge stale data from FlexSPI's AHB FIFO
 	while (FLEXSPI_MCR0 & FLEXSPI_MCR0_SWRESET) ; // wait
+#else
+	FLEXSPI2_LUT60 = LUT0(CMD_SDR, PINS1, 0x05) | LUT1(READ_SDR, PINS1, 1); // 05 = read status
+	FLEXSPI2_LUT61 = 0;
+	uint8_t status;
+	do {
+		FLEXSPI2_IPRXFCR = FLEXSPI_IPRXFCR_CLRIPRXF; // clear rx fifo
+		FLEXSPI2_IPCR0 = 0;
+		FLEXSPI2_IPCR1 = FLEXSPI_IPCR1_ISEQID(15) | FLEXSPI_IPCR1_IDATSZ(1);
+		FLEXSPI2_IPCMD = FLEXSPI_IPCMD_TRG;
+		while (!(FLEXSPI2_INTR & FLEXSPI_INTR_IPCMDDONE)) {;}
+		FLEXSPI2_INTR = FLEXSPI_INTR_IPCMDDONE;
+		asm("":::"memory");
+		status = *(uint8_t *)&FLEXSPI2_RFDR0;
+	} while (status & 1);
+	FLEXSPI2_MCR0 |= FLEXSPI_MCR0_SWRESET; // purge stale data from FlexSPI's AHB FIFO
+	while (FLEXSPI2_MCR0 & FLEXSPI_MCR0_SWRESET) ; // wait
+#endif
 	__enable_irq();
 }
 
@@ -249,6 +268,7 @@ static void flash_wait()
 void eepromemu_flash_write(void *addr, const void *data, uint32_t len)
 {
 	__disable_irq();
+#ifndef RT1064
 	FLEXSPI_LUTKEY = FLEXSPI_LUTKEY_VALUE;
 	FLEXSPI_LUTCR = FLEXSPI_LUTCR_UNLOCK;
 	FLEXSPI_IPCR0 = 0;
@@ -282,6 +302,41 @@ void eepromemu_flash_write(void *addr, const void *data, uint32_t len)
 		}
 	}
 	FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE | FLEXSPI_INTR_IPTXWE;
+#else
+	FLEXSPI2_LUTKEY = FLEXSPI_LUTKEY_VALUE;
+	FLEXSPI2_LUTCR = FLEXSPI_LUTCR_UNLOCK;
+	FLEXSPI2_IPCR0 = 0;
+	FLEXSPI2_LUT60 = LUT0(CMD_SDR, PINS1, 0x06); // 06 = write enable
+	FLEXSPI2_LUT61 = 0;
+	FLEXSPI2_LUT62 = 0;
+	FLEXSPI2_LUT63 = 0;
+	FLEXSPI2_IPCR1 = FLEXSPI_IPCR1_ISEQID(15);
+	FLEXSPI2_IPCMD = FLEXSPI_IPCMD_TRG;
+	arm_dcache_delete(addr, len); // purge old data from ARM's cache
+	while (!(FLEXSPI2_INTR & FLEXSPI_INTR_IPCMDDONE)) ; // wait
+	FLEXSPI2_INTR = FLEXSPI_INTR_IPCMDDONE;
+	FLEXSPI2_LUT60 = LUT0(CMD_SDR, PINS1, 0x32) | LUT1(ADDR_SDR, PINS1, 24); // 32 = quad write
+	FLEXSPI2_LUT61 = LUT0(WRITE_SDR, PINS4, 1);
+	FLEXSPI2_IPTXFCR = FLEXSPI_IPTXFCR_CLRIPTXF; // clear tx fifo
+	FLEXSPI2_IPCR0 = (uint32_t)addr & 0x00FFFFFF;
+	FLEXSPI2_IPCR1 = FLEXSPI_IPCR1_ISEQID(15) | FLEXSPI_IPCR1_IDATSZ(len);
+	FLEXSPI2_IPCMD = FLEXSPI_IPCMD_TRG;
+	const uint8_t *src = (const uint8_t *)data;
+	uint32_t n;
+	while (!((n = FLEXSPI2_INTR) & FLEXSPI_INTR_IPCMDDONE)) {
+		if (n & FLEXSPI_INTR_IPTXWE) {
+			uint32_t wrlen = len;
+			if (wrlen > 8) wrlen = 8;
+			if (wrlen > 0) {
+				memcpy((void *)&FLEXSPI2_TFDR0, src, wrlen);
+				src += wrlen;
+				len -= wrlen;
+			}
+			FLEXSPI2_INTR = FLEXSPI_INTR_IPTXWE;
+		}
+	}
+	FLEXSPI2_INTR = FLEXSPI_INTR_IPCMDDONE | FLEXSPI_INTR_IPTXWE;
+#endif
 	flash_wait();
 }
 
@@ -289,6 +344,7 @@ void eepromemu_flash_write(void *addr, const void *data, uint32_t len)
 void eepromemu_flash_erase_sector(void *addr)
 {
 	__disable_irq();
+#ifndef RT1064	
 	FLEXSPI_LUTKEY = FLEXSPI_LUTKEY_VALUE;
 	FLEXSPI_LUTCR = FLEXSPI_LUTCR_UNLOCK;
 	FLEXSPI_LUT60 = LUT0(CMD_SDR, PINS1, 0x06); // 06 = write enable
@@ -307,6 +363,26 @@ void eepromemu_flash_erase_sector(void *addr)
 	FLEXSPI_IPCMD = FLEXSPI_IPCMD_TRG;
 	while (!(FLEXSPI_INTR & FLEXSPI_INTR_IPCMDDONE)) ; // wait
 	FLEXSPI_INTR = FLEXSPI_INTR_IPCMDDONE;
+#else
+	FLEXSPI2_LUTKEY = FLEXSPI_LUTKEY_VALUE;
+	FLEXSPI2_LUTCR = FLEXSPI_LUTCR_UNLOCK;
+	FLEXSPI2_LUT60 = LUT0(CMD_SDR, PINS1, 0x06); // 06 = write enable
+	FLEXSPI2_LUT61 = 0;
+	FLEXSPI2_LUT62 = 0;
+	FLEXSPI2_LUT63 = 0;
+	FLEXSPI2_IPCR0 = 0;
+	FLEXSPI2_IPCR1 = FLEXSPI_IPCR1_ISEQID(15);
+	FLEXSPI2_IPCMD = FLEXSPI_IPCMD_TRG;
+	arm_dcache_delete((void *)((uint32_t)addr & 0xFFFFF000), 4096); // purge data from cache
+	while (!(FLEXSPI2_INTR & FLEXSPI_INTR_IPCMDDONE)) ; // wait
+	FLEXSPI2_INTR = FLEXSPI_INTR_IPCMDDONE;
+	FLEXSPI2_LUT60 = LUT0(CMD_SDR, PINS1, 0x20) | LUT1(ADDR_SDR, PINS1, 24); // 20 = sector erase
+	FLEXSPI2_IPCR0 = (uint32_t)addr & 0x00FFF000;
+	FLEXSPI2_IPCR1 = FLEXSPI_IPCR1_ISEQID(15);
+	FLEXSPI2_IPCMD = FLEXSPI_IPCMD_TRG;
+	while (!(FLEXSPI2_INTR & FLEXSPI_INTR_IPCMDDONE)) ; // wait
+	FLEXSPI2_INTR = FLEXSPI_INTR_IPCMDDONE;
+#endif
 	flash_wait();
 }
 

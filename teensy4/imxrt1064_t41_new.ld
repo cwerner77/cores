@@ -29,7 +29,7 @@ SECTIONS
                 __init_array_start = .;
                 KEEP (*(.init_array))
                 __init_array_end = .;
-		. = ALIGN(16);
+		. = ALIGN(1024);
 	} > FLASH
 
 	.text.itcm : {
