@@ -68,6 +68,7 @@ void eepromemu_flash_erase_sector(void *addr);
 static uint8_t initialized=0;
 static uint16_t sector_index[FLASH_SECTORS];
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 void eeprom_initialize(void)
 {
 	uint32_t sector;
@@ -85,6 +86,7 @@ void eeprom_initialize(void)
 	initialized = 1;
 }
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 uint8_t eeprom_read_byte(const uint8_t *addr_ptr)
 {
 	uint32_t addr = (uint32_t)addr_ptr;
@@ -107,6 +109,7 @@ uint8_t eeprom_read_byte(const uint8_t *addr_ptr)
 	return data;
 }
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 void eeprom_write_byte(uint8_t *addr_ptr, uint8_t data)
 {
 	uint32_t addr = (uint32_t)addr_ptr;
@@ -160,12 +163,14 @@ void eeprom_write_byte(uint8_t *addr_ptr, uint8_t data)
 	}
 }
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 uint16_t eeprom_read_word(const uint16_t *addr)
 {
 	const uint8_t *p = (const uint8_t *)addr;
 	return eeprom_read_byte(p) | (eeprom_read_byte(p+1) << 8);
 }
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 uint32_t eeprom_read_dword(const uint32_t *addr)
 {
 	const uint8_t *p = (const uint8_t *)addr;
@@ -173,6 +178,7 @@ uint32_t eeprom_read_dword(const uint32_t *addr)
 		| (eeprom_read_byte(p+2) << 16) | (eeprom_read_byte(p+3) << 24);
 }
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 void eeprom_read_block(void *buf, const void *addr, uint32_t len)
 {
 	const uint8_t *p = (const uint8_t *)addr;
@@ -182,11 +188,13 @@ void eeprom_read_block(void *buf, const void *addr, uint32_t len)
 	}
 }
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 int eeprom_is_ready(void)
 {
 	return 1;
 }
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 void eeprom_write_word(uint16_t *addr, uint16_t value)
 {
 	uint8_t *p = (uint8_t *)addr;
@@ -194,6 +202,7 @@ void eeprom_write_word(uint16_t *addr, uint16_t value)
 	eeprom_write_byte(p, value >> 8);
 }
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 void eeprom_write_dword(uint32_t *addr, uint32_t value)
 {
 	uint8_t *p = (uint8_t *)addr;
@@ -203,6 +212,7 @@ void eeprom_write_dword(uint32_t *addr, uint32_t value)
 	eeprom_write_byte(p, value >> 24);
 }
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 void eeprom_write_block(const void *buf, void *addr, uint32_t len)
 {
 	uint8_t *p = (uint8_t *)addr;
@@ -211,9 +221,6 @@ void eeprom_write_block(const void *buf, void *addr, uint32_t len)
 		eeprom_write_byte(p++, *src++);
 	}
 }
-
-
-
 
 
 #define LUT0(opcode, pads, operand) (FLEXSPI_LUT_INSTRUCTION((opcode), (pads), (operand)))
@@ -225,6 +232,7 @@ void eeprom_write_block(const void *buf, void *addr, uint32_t len)
 #define PINS1           FLEXSPI_LUT_NUM_PADS_1
 #define PINS4           FLEXSPI_LUT_NUM_PADS_4
 
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 static void flash_wait()
 {
 
@@ -265,6 +273,7 @@ static void flash_wait()
 }
 
 // write bytes into flash memory (which is already erased to 0xFF)
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 void eepromemu_flash_write(void *addr, const void *data, uint32_t len)
 {
 	__disable_irq();
@@ -341,6 +350,7 @@ void eepromemu_flash_write(void *addr, const void *data, uint32_t len)
 }
 
 // erase a 4K sector
+__attribute__ ((section(".fastrun"), noinline, noclone ))
 void eepromemu_flash_erase_sector(void *addr)
 {
 	__disable_irq();
