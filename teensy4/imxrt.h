@@ -8489,6 +8489,7 @@ typedef struct
 #define SRC_SBMR1			(IMXRT_SRC.offset004)
 #define SRC_SRSR			(IMXRT_SRC.offset008)
 #define SRC_SBMR2			(IMXRT_SRC.offset01C)
+#define SRC_GPR5			(IMXRT_SRC.offset030)
 /* 
 These register are used by the ROM code and should not be used by application software 
 #define SRC_GPR1			(IMXRT_SRC.offset020) 
@@ -9824,3 +9825,18 @@ static inline void arm_dcache_flush_delete(void *addr, uint32_t size)
 	asm("dsb");
 	asm("isb");
 }
+
+// Crash report info stored in the top 128 bytes of OCRAM (at 0x2027FF80)
+struct arm_fault_info_struct {
+	uint32_t len;
+	uint32_t ipsr;
+	uint32_t cfsr;
+	uint32_t hfsr;
+	uint32_t mmfar;
+	uint32_t bfar;
+	uint32_t ret;
+	uint32_t xpsr;
+	uint32_t crc;
+};
+
+
