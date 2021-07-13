@@ -18,6 +18,7 @@ SECTIONS
 		KEEP(*(.bootdata))
 		KEEP(*(.vectors))
 		KEEP(*(.startup))
+		*FNET.a:*(.text*)
 		*(.flashmem*)
 		*(.progmem*)
 		*(.rodata*)
